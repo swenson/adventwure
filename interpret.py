@@ -20,7 +20,6 @@ except NameError:  # Python 3
     long = int
     raw_input = input
     xrange = range
-    
 
 # raw lines
 Line = namedtuple('Line', 'comment,label,continuation,statements'.split(','))
