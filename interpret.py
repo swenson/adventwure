@@ -22,10 +22,10 @@ except NameError:  # Python 3
     xrange = range
 
 # raw lines
-Line = namedtuple('Line', 'comment,label,continuation,statements'.split(','))
+Line = namedtuple('Line', 'comment label continuation statements')
 
 # lexical analysis
-Token = namedtuple('Token', ['name', 'value'])
+Token = namedtuple('Token', 'name value')
 
 # grammar structure
 If = namedtuple('If', ['expr', 'statement'])
