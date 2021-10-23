@@ -3,7 +3,6 @@
 from __future__ import print_function
 
 import bz2
-import math
 import random
 import re
 import sys
