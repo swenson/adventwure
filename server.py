@@ -1,3 +1,4 @@
+from __future__ import print_function
 # Copyright (c) 2016-2021 Twilio Inc.
 
 import os
@@ -80,7 +81,7 @@ def run_for(from_, inp):
             return str(resp)
 
         if not exists:
-            print 'starting new game for', from_
+            print('starting new game for', from_)
             handler = TwilioHandler()
             game = Game(handler)
             t = threading.Thread(target=game.go)
@@ -98,7 +99,7 @@ def run_for(from_, inp):
             t.daemon = True
             t.start()
             states[from_] = [handler, game, t]
-            # wait fot it to boot
+            # wait for it to boot
             while not game.waiting():
                 time.sleep(0.001)
             # empty the queues
@@ -135,7 +136,7 @@ def run_for(from_, inp):
 
 @app.route("/incoming-voice", methods=['GET', 'POST'])
 def voice_reply():
-    print 'Form', request.form
+    print('Form', request.form)
     from_ = request.form['DialogueSid'][2:34]
     inp = ''
     if 'Field_word1_Value' in request.form:

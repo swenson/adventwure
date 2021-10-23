@@ -1,3 +1,4 @@
+from __future__ import print_function
 # Copyright (c) 2016-2021 Twilio Inc.
 
 from collections import namedtuple
@@ -167,7 +168,7 @@ def tokenize(text):
         return Token('OP', text[0]), 1
     elif text[0] == ',':
         return Token('COMMA', text[0]), 1
-    print 'tokenize', text
+    print('tokenize', text)
     exit()
 
 def text_to_tokens(text):
@@ -180,7 +181,7 @@ def text_to_tokens(text):
             return String(text.value)
         if text.name == 'EXPR':
             return text.value
-        print 'unknown token type', text
+        print('unknown token type', text)
         exit()
     elif isinstance(text, list):
         tokens = text
@@ -294,7 +295,7 @@ def parse_expr_piece(tokens):
             return String(tokens[0].value), 1
         if tokens[0].name == 'EXPR':
             return tokens[0].value, 1
-        print 'unknown token type', tokens[0]
+        print('unknown token type', tokens[0])
         exit()
     if len(tokens) >= 4 and tokens[0].name == 'WORD' and tokens[1].name == 'LPAREN':
         name = parse_expr_piece(tokens[:1])[0]
@@ -332,7 +333,7 @@ def parse_expr_piece(tokens):
     # implicit 0
     if tokens[0].name == 'OP' and tokens[0].value == '-':
         return parse_expr_piece([Token('NUM', '0')] + tokens)
-    print 'unknown expr', tokens
+    print('unknown expr', tokens)
     exit()
 
 def parse_expr_list(text):
@@ -348,7 +349,7 @@ def parse_expr_list(text):
     if tokens[1].name == 'COMMA':
         return (parse_expr(tokens[:1]),) + parse_expr_list(tokens[1:])
     return tuple([parse_expr(x) for x in smart_split_tokens(tokens)])
-    print 'parse list', tokens
+    print('parse list', tokens)
     exit()
 
 def parse_expr_list2(text):
@@ -365,7 +366,7 @@ def parse_expr_list2(text):
     if '(' not in text:
         return tuple([parse_expr(x) for x in text.split(',')])
     t = tuple([parse_expr(x) for x in smart_split(text)])
-    print 'parse list', text, t
+    print('parse list', text, t)
     exit()
 
 # paren-aware comma-split
@@ -428,7 +429,7 @@ def parse_format_item(text):
         return String(text[1:-1])
     if text == '/':
         return None
-    print 'format', text
+    print('format', text)
     exit()
 
 def parse_format_list(text):
@@ -570,15 +571,15 @@ class Game(object):
                 self.current_subroutine = statement.name
                 self.labels[self.current_subroutine] = {}
             if DEBUG:
-                print
-                print line.statements
-                print statement
-                print
+                print()
+                print(line.statements)
+                print(statement)
+                print()
             self.prog.append(statement)
             if line.label:
                 self.labels[self.current_subroutine][line.label] = len(self.prog) - 1
                 if DEBUG:
-                    print line.label
+                    print(line.label)
             if isinstance(statement, Subroutine):
                 self.subroutines[statement.name] = len(self.prog) - 1
 
@@ -629,7 +630,7 @@ class Game(object):
                 for i in range(len(rhs)):
                     statements.append(ArrayAssign(name, i + 1, parse_expr(rhs[i])))
                 return Compound(statements)
-            print 'data', lhs, rhs
+            print('data', lhs, rhs)
             exit()
         elif statement.startswith('DO'):
             statement = statement[2:].strip()
@@ -702,7 +703,7 @@ class Game(object):
                 for i in xrange(ra, rb + 1, 1):
                     read_args.append(ArrayExpr(var, with_set(largs, rname, Int(i))))
                 return Read(source, formatLabel, read_args)
-            print 'read', args
+            print('read', args)
             exit()
         elif statement.startswith('FORMAT'):
             return Format(parse_format_list(statement[7:-1]))
@@ -743,7 +744,7 @@ class Game(object):
             if text.startswith('INTEGER'):
                 kind = 'INTEGER'
             else:
-                print 'halt on', stmt
+                print('halt on', stmt)
                 exit()
             pieces = text.split('(')
             names = pieces[1][:-1].split('-')
@@ -772,7 +773,7 @@ class Game(object):
             lhs = parse_expr(lhs)
             rhs = parse_expr(rhs)
             return Assign(lhs, rhs)
-        print 'statement', statement
+        print('statement', statement)
         exit()
 
     def go(self):
@@ -839,7 +840,7 @@ class Game(object):
                     f = int(self.read_float(arg))
                     self.assign(var, f)
                 continue
-            print 'halt on format', format, vars
+            print('halt on format', format, vars)
             exit()
         self.next_record()
 
@@ -881,13 +882,13 @@ class Game(object):
                     return
                 v[int(index) - 1] = value
                 return
-        print 'failed array lookup', varname, [v.keys() for v in varstack]
+        print('failed array lookup', varname, [list(v) for v in self.varstack])
         exit()
 
     def eval_expr(self, expr):
         result = self.eval_expr_inner(expr)
         if DEBUG:
-            print 'eval expr', expr, '->', result
+            print('eval expr', expr, '->', result)
         return result
 
     def eval_expr_inner(self, expr):
@@ -972,7 +973,7 @@ class Game(object):
             return self.eval_expr(expr[0])
         if isinstance(expr, tuple) and not hasattr(expr, '__slots__'):
             return tuple([self.eval_expr(x) for x in expr])
-        print 'halt on eval expr', expr
+        print('halt on eval expr', expr)
         exit()
 
     # output
@@ -1025,7 +1026,7 @@ class Game(object):
             elif isinstance(arg, String):
                 self.handler.write(arg.value)
                 continue
-            print 'halt on format', format, vars
+            print('halt on format', format, vars)
             exit()
         self.handler.write("\n")
 
@@ -1078,7 +1079,7 @@ class Game(object):
 
     def execute_statement(self, stmt, current):
         if DEBUG:
-            print 'execute', stmt
+            print('execute', stmt)
         if isinstance(stmt, If):
             expr = self.eval_expr(stmt.expr)
             if isinstance(expr, bool) or isinstance(expr, int):
@@ -1160,7 +1161,7 @@ class Game(object):
             self.varstack.pop()
             for var, (original_var, val) in assigns.items():
                 if DEBUG:
-                    print 'return %s variable %s -> %s -> %s' % (callstmt.name, var, original_var, val)
+                    print('return %s variable %s -> %s -> %s' % (callstmt.name, var, original_var, val))
                 self.assign(var, val)
             return self.progstack.pop() + 1
         elif isinstance(stmt, Read):
@@ -1172,13 +1173,13 @@ class Game(object):
             return
         elif stmt == End:
             if current_subroutine == '__main__':
-                print 'Program ended'
+                print('Program ended')
                 exit()
             return
         elif isinstance(stmt, Goto):
             choice = int(self.eval_expr(stmt.choice)) - 1
             if DEBUG:
-                print 'goto choice', choice
+                print('goto choice', choice)
             if choice < 0 or choice >= len(stmt.labels):
                 # just ignore
                 return
@@ -1236,7 +1237,7 @@ class Game(object):
                 self.varstack[-1][var] = 0.0
             return
 
-        print 'halt on', stmt
+        print('halt on', stmt)
         exit()
 
 
@@ -1278,7 +1279,7 @@ def equals_inner(a, b):
         return False
     if isinstance(a, str) and b == 0:
         return False
-    print 'failed to compare "%s" %s "%s" %s' % (a, type(a), b, type(b))
+    print('failed to compare "%s" %s "%s" %s' % (a, type(a), b, type(b)))
     exit()
 
 def string_to_dec_num(text):
