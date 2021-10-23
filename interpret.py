@@ -1,5 +1,6 @@
-from __future__ import print_function
 # Copyright (c) 2016-2021 Twilio Inc.
+
+from __future__ import print_function
 
 from collections import namedtuple
 import bz2
@@ -11,11 +12,20 @@ import sys
 
 DEBUG = False
 
+try:  # Python 2
+    long
+    raw_input
+    xrange
+except NameError:  # Python 3
+    long = int
+    raw_input = input
+    xrange = range
+
 # raw lines
-Line = namedtuple('Line', 'comment,label,continuation,statements'.split(','))
+Line = namedtuple('Line', 'comment label continuation statements')
 
 # lexical analysis
-Token = namedtuple('Token', ['name', 'value'])
+Token = namedtuple('Token', 'name value')
 
 # grammar structure
 If = namedtuple('If', ['expr', 'statement'])
@@ -1172,7 +1182,7 @@ class Game(object):
         elif isinstance(stmt, Format):
             return
         elif stmt == End:
-            if current_subroutine == '__main__':
+            if self.current_subroutine == '__main__':
                 print('Program ended')
                 exit()
             return
