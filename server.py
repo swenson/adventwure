@@ -99,7 +99,7 @@ def run_for(from_, inp):
             t.daemon = True
             t.start()
             states[from_] = [handler, game, t]
-            # wait fot it to boot
+            # wait for it to boot
             while not game.waiting():
                 time.sleep(0.001)
             # empty the queues
