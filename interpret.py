@@ -882,7 +882,7 @@ class Game(object):
                     return
                 v[int(index) - 1] = value
                 return
-        print('failed array lookup', varname, [v.keys() for v in varstack])
+        print('failed array lookup', varname, [list(v) for v in self.varstack])
         exit()
 
     def eval_expr(self, expr):
