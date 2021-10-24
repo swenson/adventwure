@@ -2,11 +2,16 @@ from __future__ import print_function
 # Copyright (c) 2016-2021 Twilio Inc.
 
 import os
-from Queue import Queue
 import threading
 import time
 
+try:  # Python 3
+    from queue import Queue
+except ImportError:  # Python 2
+    from Queue import Queue
+
 import psycopg2
+
 dburl = os.getenv('DATABASE_URL')
 if not dburl:
     dburl = 'dbname=test user=cswenson'
@@ -21,26 +26,29 @@ try:
             modified TIMESTAMP WITH TIME ZONE DEFAULT NOW());
     """)
     conn.commit()
-except:
+except Exception:
     pass
 cur.close()
 
 from twilio import twiml
 from flask import Flask, request, jsonify, Request
 from werkzeug.datastructures import ImmutableOrderedMultiDict
+
+from interpret import Game
+
+
 class MyRequest(Request):
     """Request subclass to override request parameter storage"""
     parameter_storage_class = ImmutableOrderedMultiDict
+
+
 class MyFlask(Flask):
     """Flask subclass using the custom request class"""
     request_class = MyRequest
 
+
 app = MyFlask(__name__)
 
-
-
-
-from interpret import Game
 
 class TwilioHandler(object):
     def __init__(self):
@@ -69,12 +77,12 @@ def run_for(from_, inp):
         ignore_input = False
         new_game = False
 
-        if inp == 'RESET' or inp == 'QUIT' or inp == 'PURGE':
+        if inp in ('RESET', 'QUIT', 'PURGE'):
             if from_ in states:
                 del states[from_]
-                exists = False # force a reset
+                exists = False  # force a reset
                 cur.execute("DELETE FROM adventure WHERE num = %s", (from_,))
-        if inp == 'PURGE':
+        elif inp == 'PURGE':
             resp = twiml.Response()
             text = 'Your data has been purged from the database. Text back to start a new game in the future if you like.'
             resp.message(text)
@@ -146,9 +154,7 @@ def voice_reply():
     inp = inp.strip()[:20]
     if inp == '':
         inp = request.values.get('CurrentInput') or ''
-    inp = inp.strip().upper()
-    inp = inp.replace('.', '')
-    inp = inp.replace(',', '')
+    inp = inp.strip().upper().replace('.', '').replace(',', '')
     inp = str(inp)
     print('Recognized input %s' % inp)
 

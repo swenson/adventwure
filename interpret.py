@@ -2,13 +2,16 @@
 
 from __future__ import print_function
 
-from collections import namedtuple
 import bz2
-import cPickle as pickle
-import math
-import re
 import random
+import re
 import sys
+from collections import namedtuple
+
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 
 DEBUG = False
 
@@ -90,7 +93,7 @@ def parse_line(line):
     line = line.replace('\t', ' ' * 8)
     if not line:
         return commentLine
-    if line[0] == 'C' or line[0] == '*':
+    if line[0] in 'C*':
         return commentLine
     label = line[0:5].strip()
     if label:
@@ -153,10 +156,7 @@ def tokenize(text):
         while i < len(text) and (text[i].isalpha() or text[i].isdigit()):
             i += 1
         return Token('WORD', text[:i]), i
-    elif text.startswith('&NE&') or text.startswith('&GT&') or \
-         text.startswith('&LT&') or text.startswith('&GE&') or \
-         text.startswith('&LE&') or text.startswith('&EQ&') or \
-         text.startswith('&OR&'):
+    elif text.startswith(('&NE&', '&GT&', '&LT&', '&GE&', '&LE&', '&EQ&', '&OR&')):
         return Token('OP', '.' + text[1:3] + '.'), 4
     elif text.startswith('&AND&') or text.startswith('&XOR&'):
         return Token('OP', '.' + text[1:4] + '.'), 5
@@ -173,8 +173,7 @@ def tokenize(text):
     elif text[0] == "'":
         r = text.index("'", 1)
         return Token('STRING', text[1:r]), r + 1
-    elif text[0] == '+' or text[0] == '-' or text[0] == '*' or text[0] == '/' or \
-         text[0] == '=':
+    elif text[0] in '+-*/=':
         return Token('OP', text[0]), 1
     elif text[0] == ',':
         return Token('COMMA', text[0]), 1
