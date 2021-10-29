@@ -502,6 +502,7 @@ class Game(object):
     def getstate(self):
         d = dict(
             globals=self.globals,
+            globImplicit=self.globImplicit,
             subroutines=self.subroutines,
             substack=self.substack,
             stmtstack=self.stmtstack,
@@ -518,6 +519,7 @@ class Game(object):
     def setstate(self, incoming):
         data = pickle.loads(bz2.decompress(incoming))
         self.globals = data['globals']
+        self.globImplicit = data['globImplicit']
         self.subroutines = data['subroutines']
         self.substack = data['substack']
         self.stmtstack = data['stmtstack']
@@ -536,6 +538,7 @@ class Game(object):
     def __init__(self, handler):
         self.handler = handler
         self.globals = {}
+        self.globImplicit = {}
         self.subroutines = {}
         self.current_subroutine = '__main__'
         self.substack = ['__main__']
@@ -557,8 +560,19 @@ class Game(object):
                 continue
             self.words = line.statements.split(' ')
 
-            if self.words[0] == 'IMPLICIT':
-                pass
+            if self.words[0] == 'IMPLICIT' and self.current_subroutine == '__main__':
+                kind = 'REAL'
+                if self.words[1].startswith('INTEGER'):
+                    kind = 'INTEGER'
+                pieces = self.words[1].split('(')
+                names = pieces[1][:-1].split('-')
+                vars = []
+                for c in xrange(ord(names[0]), ord(names[1]) + 1):
+                    vars.append(chr(c))
+                if kind == 'INTEGER':
+                    self.globImplicit['IMPLICIT-INT'] = Implicit(kind, vars)
+                else:
+                    self.globImplicit['IMPLICIT-REAL'] = Implicit(kind. vars)
             if self.words[0] == 'REAL':
                 pass
             if self.words[0] == 'COMMON':
@@ -566,7 +580,7 @@ class Game(object):
             if self.words[0] == 'INTEGER':
                 pass
             if self.words[0] == 'DIMENSION' and self.current_subroutine == '__main__':
-                # array of reals
+                # array of numbers
                 pieces = self.words[1].split('),')
                 for piece in pieces:
                     name = piece.split('(')[0]
@@ -578,7 +592,18 @@ class Game(object):
                         size = (a, b)
                     else:
                         size = int(size)
-                    self.globals[name] = make_dimension(size)
+
+                    # If Implicit statement exists
+                    # specifing first letter of variable use Implicit to type variable
+                    defaultVal = 0.0
+                    if self.globImplicit.get('IMPLICIT-INT',None) != None:
+                        if name[0] in self.globImplicit['IMPLICIT-INT'].vars:
+                            defaultVal = 0
+                    elif self.globImplicit.get('IMPLICIT-REAL',None) != None:
+                        if varname[0] in self.globImplicit['IMPLICIT-REAL'].vars:
+                            defaultVal = 0.0
+
+                    self.globals[name] = make_dimension(size,defaultVal)
                 continue
             statement = self.parse_statement(line.statements)
             if statement is None:
@@ -1262,7 +1287,18 @@ class Game(object):
                 # hack
                 if arg[0] == 'RTEXT' or arg[0] == 'LLINE':
                     continue
-                self.varstack[-1][arg[0]] = make_dimension(arg[1])
+
+                # If Implicit statement exists
+                # specifing first letter of variable use Implicit to type variable
+                defaultVal = 0.0
+                if self.varstack[-1].get('IMPLICIT-INT',None) != None:
+                    if arg[0][0] in self.varstack[-1]['IMPLICIT-INT'].vars:
+                        defaultVal = 0
+                elif self.varstack[-1].get('IMPLICIT-REAL',None) != None:
+                    if arg[0][0] in self.varstack[-1]['IMPLICIT-REAL'].vars:
+                        defaultVal = 0.0
+
+                self.varstack[-1][arg[0]] = make_dimension(arg[1],defaultVal)
             return
         elif isinstance(stmt, Type):
             format = self.prog[self.labels[self.current_subroutine][stmt.formatLabel]]
@@ -1289,14 +1325,14 @@ class Game(object):
         exit()
 
 
-def make_dimension(size):
+def make_dimension(size,defaultVal):
     if isinstance(size, tuple):
         a, b = size
         mat = []
         for i in xrange(a):
-            mat.append([0] * b)
+            mat.append([defaultVal] * b)
         return ["MREAL", (a, b), mat]
-    return ["AREAL", size, [0] * size]
+    return ["AREAL", size, [defaultVal] * size]
 
 def equals(a, b):
     result = equals_inner(a, b)
