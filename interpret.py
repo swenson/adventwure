@@ -8,11 +8,14 @@ import re
 import sys
 from collections import namedtuple
 
+
 try:
     import cPickle as pickle
 except ImportError:
     import pickle
 
+
+global DEBUG
 DEBUG = False
 
 try:  # Python 2
@@ -23,7 +26,6 @@ except NameError:  # Python 3
     long = int
     raw_input = input
     xrange = range
-
 # raw lines
 Line = namedtuple('Line', 'comment label continuation statements')
 
@@ -37,15 +39,12 @@ Goto = namedtuple('Goto', ['labels', 'choice'])
 Assign = namedtuple('Assign', ['lhs', 'rhs'])
 Comparison = namedtuple('Compare', ['a', 'op', 'b'])
 Name = namedtuple('Name', ['name'])
-Int = namedtuple('Int', ['value'])
-Float = namedtuple('Float', ['value'])
 Compound = namedtuple('Compound', ['statements'])
 ArrayAssign = namedtuple('ArrayAssign', ['name', 'index', 'expr'])
 Do = namedtuple('Do', ['label', 'var', 'start', 'end', 'step'])
 ArrayExpr = namedtuple('ArrayExpr', ['name', 'index'])
 arrayExprRegex = re.compile(r'^([a-zA-Z0-9]+)\((.*)\)$')
 Call = namedtuple('Call', ['name', 'args'])
-String = namedtuple('String', ['value'])
 Read = namedtuple('Read', ['device', 'formatLabel', 'vars'])
 Format = namedtuple('Format', ['args'])
 Op = namedtuple('Op', ['op', 'a', 'b'])
@@ -62,11 +61,17 @@ Ran = namedtuple('Ran', ['arg'])
 Subroutine = namedtuple('Subroutine', ['name', 'args'])
 Return = ('return',)
 Dimension = namedtuple('Dimension', ['args'])
+ExplDeclare = namedtuple('ExplDeclare',['type','vars'])
 Implicit = namedtuple('Implicit', ['kind', 'vars'])
 numericIfRegex = re.compile(r'^(\d+),(\d+),(\d+)$')
 
+# data types
+String = namedtuple('String', ['value'])
+Int = namedtuple('Int', ['value'])
+Float = namedtuple('Float', ['value'])
+
 # format
-IntegerFormat = namedtuple('IntegerFormat', ['digits'])
+IntegerFormat = namedtuple('IntegerFormat', ['count','digits'])
 FloatFormat = namedtuple('FloatFormat', ['count', 'whole', 'fraction'])
 AsciiFormat = namedtuple('AsciiFormat', ['count', 'read'])
 asciiFormatRegex = re.compile(r'^(\d+)A(\d+)$')
@@ -433,7 +438,7 @@ def parse_format_item(text):
     if text.startswith('A'):
         return AsciiFormat(1, int(text[1:]))
     if text.startswith('I'):
-        return IntegerFormat(int(text[1:]))
+        return IntegerFormat(1,int(text[1:]))
     if text.startswith("'"):
         return String(text[1:-1])
     if text == '/':
@@ -555,9 +560,11 @@ class Game(object):
             if self.words[0] == 'IMPLICIT':
                 pass
             if self.words[0] == 'REAL':
-                continue
+                pass
             if self.words[0] == 'COMMON':
                 continue
+            if self.words[0] == 'INTEGER':
+                pass
             if self.words[0] == 'DIMENSION' and self.current_subroutine == '__main__':
                 # array of reals
                 pieces = self.words[1].split('),')
@@ -629,14 +636,14 @@ class Game(object):
                 length = rang[1] - rang[0] + 1
                 statements = []
                 rhs = rhs.split(',')
-                for i in range(rang[0], rang[1] + 1):
+                for i in xrange(rang[0], rang[1] + 1):
                     statements.append(ArrayAssign(name, i, parse_expr(rhs[i - 1])))
                 return Compound(statements)
             else:
                 name = lhs.strip()
                 rhs = rhs.split(',')
                 statements = []
-                for i in range(len(rhs)):
+                for i in xrange(len(rhs)):
                     statements.append(ArrayAssign(name, i + 1, parse_expr(rhs[i])))
                 return Compound(statements)
             print('data', lhs, rhs)
@@ -776,7 +783,18 @@ class Game(object):
                     size = int(size)
                     args.append((name, size))
             return Dimension(tuple(args))
-
+        elif statement.startswith('INTEGER'):
+            pieces = self.words[1].split(',')
+            args = []
+            for piece in pieces:
+                args.append(piece)
+            return ExplDeclare('INTEGER',args)
+        elif statement.startswith('REAL'):
+            pieces = self.words[1].split(',')
+            args = []
+            for piece in pieces:
+                args.append(piece)
+            return ExplDeclare('REAL',args)
         if '=' in statement:
             lhs, rhs = statement.split('=')
             lhs = parse_expr(lhs)
@@ -869,10 +887,28 @@ class Game(object):
         if isinstance(varname, ArrayExpr):
             self.array_assign(varname.name, self.eval_expr(varname.index), value)
             return
-        for i in xrange(len(self.varstack) - 1, -1, -1):
-            if varname in self.varstack[i]:
-                self.varstack[i][varname] = value
+        #for i in xrange(len(self.varstack) - 1, -1, -1):
+        # if variable instance already exists do not change the type of variable stored
+        if varname in self.varstack[-1]:
+            if isinstance(self.varstack[-1][varname],int) and isinstance(value,float):
+                self.varstack[-1][varname] = int(value)
+            elif isinstance(self.varstack[-1][varname],float) and isinstance(value,int):
+                self.varstack[-1][varname] = float(value)
+            else:
+                self.varstack[-1][varname] = value
+            return
+
+        # If variable instance doesn't exist yet and Implicit statement exists
+        # specifing first letter of variable use Implicit to type variable
+        if self.varstack[-1].get('IMPLICIT-INT',None) != None:
+            if varname[0] in self.varstack[-1]['IMPLICIT-INT'].vars and isinstance(value,float):
+                self.varstack[-1][varname] = int(value)
                 return
+        if self.varstack[-1].get('IMPLICIT-REAL',None) != None:
+            if varname[0] in self.varstack[-1]['IMPLICIT-REAL'].vars and isinstance(value,int):
+                self.varstack[-1][varname] = float(value)
+                return
+
         self.varstack[-1][varname] = value
 
     def array_assign(self, varname, index, value):
@@ -881,7 +917,8 @@ class Game(object):
         if isinstance(index, tuple):
             if len(index) == 1:
                 index = index[0]
-        for i in xrange(len(self.varstack) - 1, -1, -1):
+        #for i in xrange(len(self.varstack) - 1, -1, -1):
+        for i in xrange(-1,-2,-1):
             if varname in self.varstack[i]:
                 v = self.varstack[i][varname][2]
                 if isinstance(index, tuple):
@@ -908,25 +945,17 @@ class Game(object):
         if isinstance(expr, Op):
             a = self.eval_expr(expr.a)
             b = self.eval_expr(expr.b)
+            if isinstance(a, str):
+                a = string_to_dec_num(a)
+            if isinstance(b, str):
+                b = string_to_dec_num(b)
             if expr.op == '.XOR.':
-                if isinstance(a, str):
-                    a = string_to_dec_num(a)
-                if isinstance(b, str):
-                    b = string_to_dec_num(b)
                 return a ^ b
             if expr.op == '.AND.':
-                if isinstance(a, str):
-                    a = string_to_dec_num(a)
-                if isinstance(b, str):
-                    b = string_to_dec_num(b)
                 a = int(a)
                 b = int(b)
                 return a & b
             if expr.op == '.OR.':
-                if isinstance(a, str):
-                    a = string_to_dec_num(a)
-                if isinstance(b, str):
-                    b = string_to_dec_num(b)
                 return a | b
             if expr.op == '.NE.':
                 return (not equals(a, b)) * -1
@@ -1040,6 +1069,7 @@ class Game(object):
         self.handler.write("\n")
 
     def execute_accept(self, format, vars):
+        global DEBUG
         if isinstance(vars, ArrayRange):
             # hack
             if not hasattr(vars.expr, 'name'):
@@ -1054,6 +1084,9 @@ class Game(object):
             vars = new_vars
         self.waiting_for_user = True
         line = self.handler.read()
+        if line == "*":
+            DEBUG = not DEBUG
+            line = ""
         self.waiting_for_user = False
         old_data = self.data
         old_data_cursor = self.data_cursor
@@ -1236,14 +1269,20 @@ class Game(object):
             self.execute_type(format, stmt.args)
             return
         elif isinstance(stmt, Implicit):
-            if self.current_subroutine == '__main__':
-                vars = stmt.vars
-            else:
-                # don't redeclare things that are arguments
-                remove = set([x.name for x in self.prog[self.subroutines[self.current_subroutine]].args])
-                vars = set(stmt.vars) - remove
-            for var in vars:
-                self.varstack[-1][var] = 0.0
+            # Only works for one IMPLICIT statement of each type per module
+            # could be improved to additivly build list of starting variable letters
+            if stmt.kind == 'INTEGER':
+                self.varstack[-1]['IMPLICIT-INT'] = stmt
+            elif stmt.kind == 'REAL':
+                self.varstack[-1]['IMPLICIT-REAL'] = stmt
+            return
+        elif isinstance(stmt, ExplDeclare):
+            # Create instance of variable and sets the type
+            # Decleration must be prior to variable use in module
+            # Could be improved to support default value within // and array dimensions
+            # as well as support for more than just INTEGER and REAL types
+            for varname in stmt.vars:
+                self.varstack[-1][varname] = (0 if stmt.type == 'INTEGER' else 0.0)
             return
 
         print('halt on', stmt)
@@ -1255,9 +1294,9 @@ def make_dimension(size):
         a, b = size
         mat = []
         for i in xrange(a):
-            mat.append([0.0] * b)
+            mat.append([0] * b)
         return ["MREAL", (a, b), mat]
-    return ["AREAL", size, [0.0] * size]
+    return ["AREAL", size, [0] * size]
 
 def equals(a, b):
     result = equals_inner(a, b)
@@ -1314,7 +1353,7 @@ def to_string(num):
     maxl = 5
     offset = 0
     bitshift = 1
-    num = num / 2
+    num = int(num / 2)
     # sometimes this is removed because of a hack
     num |= 0x400000000
     return ''.join(chr((num >> (i * 7)) & 0x7f) for i in xrange(4, -1, -1))
